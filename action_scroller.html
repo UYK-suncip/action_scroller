@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>횡스크롤 액션 게임 - 확장판</title>
+<style>
+    body {
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #1a252f;
+        overflow: hidden;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        touch-action: none;
+    }
+
+    #game-container {
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        height: 100%;
+        max-height: 400px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #game-window {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        background-color: #87CEEB;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        border-radius: 8px;
+    }
+
+    /* ─── 로비 및 UI 스타일 ─── */
+    #lobby-screen {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #2c3e50;
+        z-index: 300;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    #lobby-title {
+        font-size: clamp(24px, 5vw, 36px);
+        margin-bottom: 20px;
+        color: #f1c40f;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        text-align: center;
+    }
+
+    .nickname-container {
+        margin-bottom: 20px;
+    }
+
+    .nickname-container input {
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 4px;
+        border: none;
+        width: 200px;
+        text-align: center;
+        outline: none;
+    }
+
+    .lobby-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .btn-start { background-color: #2ecc71; color: white; }
+    .btn-start:hover { background-color: #27ae60; }
+    .btn-tab { background-color: #34495e; color: white; border: 1px solid #7f8c8d; }
+    .btn-tab:hover { background-color: #465c71; }
+
+    /* 팝업 모달 스타일 */
+    .modal {
+        display: none;
+        position: absolute;
+        top: 5%; left: 5%; width: 90%; height: 90%;
+        background-color: rgba(44, 62, 80, 0.98);
+        border: 2px solid #f1c40f;
+        border-radius: 8px;
+        z-index: 310;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        color: white;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 10px; right: 15px;
+        font-size: 28px;
+        cursor: pointer;
+        color: #e74c3c;
+    }
+
+    /* 랭킹 테이블 */
+    .ranking-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .ranking-table th, .ranking-table td {
+        border: 1px solid #7f8c8d;
+        padding: 10px;
+        text-align: center;
+    }
+    .ranking-table th { background-color: #34495e; color: #f1c40f; }
+    .ranking-table tr:nth-child(even) { background-color: rgba(255,255,255,0.05); }
+
+    /* 도감 UI */
+    .book-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .book-item {
+        background-color: #34495e;
+        padding: 15px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .book-visual {
+        width: 40px; height: 40px;
+        border-radius: 8px;
+        border: 2px solid #fff;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }
+
+    /* 인게임 UI */
+    #ui-layer {
+        position: absolute;
+        top: 15px; right: 20px;
+        color: #fff; font-size: 18px; font-weight: bold;
+        background-color: rgba(0, 0, 0, 0.6);
+        padding: 8px 16px; border-radius: 8px;
+        z-index: 100; user-select: none;
+    }
+
+    #gameover-screen {
+        display: none; 
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        color: white;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 200; user-select: none;
+        text-align: center;
+    }
+
+    #gameover-screen h1 { font-size: clamp(32px, 6vw, 48px); margin: 0 0 10px 0; color: #ff1744; }
+    #gameover-screen p { font-size: 18px; margin: 5px 0; color: #e0e0e0; }
+    #gameover-screen .restart-tip { margin-top: 20px; font-size: 16px; color: #FFEB3B; font-weight: bold; }
+
+    #camera { position: absolute; width: 100%; height: 100%; transition: transform 0.1s linear; }
+
+    .map-chunk {
+        position: absolute; width: 800px; height: 100%; top: 0;
+        box-sizing: border-box; border-left: 2px solid rgba(255,255,255,0.2);
+    }
+    .map-chunk::after {
+        content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 50px;
+        background-color: #5D4037; border-top: 6px solid #4CAF50; z-index: 8; 
+    }
+
+    #character {
+        position: absolute; width: 40px; height: 40px; background-color: #FFEB3B;
+        border: 2px solid #F57F17; box-sizing: border-box; border-radius: 8px;
+        top: 0; left: 0; z-index: 10; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    }
+
+    .platform { position: absolute; background-color: #FF9800; border-radius: 4px; border: 2px solid #E65100; box-sizing: border-box; z-index: 9; }
+    .obstacle { position: absolute; background-color: #607D8B; border-radius: 4px; border: 2px solid #37474F; box-sizing: border-box; z-index: 9; }
+    
+    /* 적 기본 스타일 */
+    .enemy { position: absolute; top: 0; left: 0; border-radius: 8px; box-sizing: border-box; border: 2px solid #fff; z-index: 6; }
+    
+    .enemy.trap { background: linear-gradient(135deg, #424242 0%, #212121 100%); border: 3px solid #616161; border-radius: 4px; position: relative;}
+    .enemy.trap::before, .enemy.trap::after {
+        content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; background-color: #ff1744; z-index: -1;
+    }
+    .enemy.trap.active::before { width: 250%; height: 250%; transform: translate(-50%, -50%) rotate(45deg); border-radius: 4px; }
+    .enemy.trap.active::after { width: 250%; height: 250%; transform: translate(-50%, -50%) rotate(0deg); border-radius: 4px; }
+
+    .weapon-aura {
+        position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; background-color: rgba(255, 0, 0, 0.6);
+        border: 2px solid #ff1744; box-sizing: border-box; border-radius: 50%; transform: translate(-50%, -50%) scale(0); 
+        opacity: 0; transition: transform 0.15s ease-out, opacity 0.15s ease-out; z-index: -1;
+    }
+    .weapon-aura.active { transform: translate(-50%, -50%) scale(2.5); opacity: 1; }
+
+    .spear-aura {
+        position: absolute; top: 5px; width: 80px; height: 12px;
+        background: linear-gradient(90deg, rgba(255,23,68,0.8) 0%, rgba(255,23,68,0) 100%);
+        border: 1px solid #ff1744; box-sizing: border-box; opacity: 0; transform: scaleX(0); z-index: -1;
+    }
+    .spear-aura.right { left: 100%; transform-origin: left center; }
+    .spear-aura.left { right: 100%; transform-origin: right center; background: linear-gradient(270deg, rgba(255,23,68,0.8) 0%, rgba(255,23,68,0) 100%); }
+    .spear-aura.active { opacity: 1; transform: scaleX(1); transition: transform 0.1s ease-out, opacity 0.1s; }
+
+    /* 🌟 Slasher 경고 및 공격 이펙트 */
+    .slash-warning {
+        position: absolute; bottom: 0; width: 70px; height: 70px;
+        background: rgba(255, 235, 59, 0.2);
+        border: 2px dashed #FFEB3B; box-sizing: border-box;
+        opacity: 0; z-index: -2; transition: opacity 0.1s;
+    }
+    .slash-warning.right { left: 100%; border-radius: 0 70px 0 0; border-left: none; border-bottom: none;}
+    .slash-warning.left { right: 100%; border-radius: 70px 0 0 0; border-right: none; border-bottom: none;}
+    .slash-warning.active { opacity: 1; }
+
+    .slash-hit {
+        position: absolute; bottom: 0; width: 70px; height: 70px;
+        background: radial-gradient(circle at bottom left, rgba(233,30,99,0) 15%, rgba(233,30,99,0.8) 70%, rgba(255,255,255,0.9) 95%);
+        border: 3px solid #E91E63; box-sizing: border-box;
+        opacity: 0; z-index: -1; 
+    }
+    .slash-hit.right { 
+        left: 100%; border-radius: 0 70px 0 0; 
+        transform-origin: left bottom; transform: rotate(-90deg);
+        border-left: none; border-bottom: none;
+    }
+    .slash-hit.left { 
+        right: 100%; border-radius: 70px 0 0 0; 
+        transform-origin: right bottom; transform: rotate(90deg); 
+        border-right: none; border-bottom: none;
+        background: radial-gradient(circle at bottom right, rgba(233,30,99,0) 15%, rgba(233,30,99,0.8) 70%, rgba(255,255,255,0.9) 95%);
+    }
+    .slash-hit.active { 
+        opacity: 1; transform: rotate(0deg); 
+        transition: transform 0.15s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.1s; 
+    }
+
+    /* 🚀 Charger 경고 및 대시 이펙트 */
+    .dash-warning {
+        position: absolute; bottom: 0; width: 160px; height: 30px;
+        background: rgba(255, 235, 59, 0.2);
+        border: 2px dashed #FFEB3B; box-sizing: border-box;
+        opacity: 0; z-index: -2; transition: opacity 0.1s;
+    }
+    .dash-warning.right { left: 100%; border-left: none; }
+    .dash-warning.left { right: 100%; border-right: none; }
+    .dash-warning.active { opacity: 1; }
+
+    /* 대시 발동 시 본체 스타일 변화 */
+    .enemy.charger.dashing {
+        background-color: #ff1744 !important;
+        box-shadow: 0 0 15px 5px rgba(255, 23, 68, 0.8);
+        border-color: #fff;
+    }
+
+    /* 모바일 컨트롤 (터치용) */
+    #mobile-controls {
+        display: none;
+        width: 100%;
+        max-width: 800px;
+        justify-content: space-between;
+        padding: 10px;
+        box-sizing: border-box;
+        margin-top: 10px;
+    }
+    @media (max-width: 820px) {
+        #mobile-controls { display: flex; }
+        #game-window { height: 350px; border-radius: 0; }
+    }
+
+    .ctrl-group { display: flex; gap: 10px; }
+    .ctrl-btn {
+        width: 60px; height: 60px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border: 2px solid #fff;
+        border-radius: 50%;
+        color: white; font-size: 24px; font-weight: bold;
+        display: flex; justify-content: center; align-items: center;
+        user-select: none;
+    }
+    .ctrl-btn:active { background-color: rgba(255,255,255,0.5); }
+    .ctrl-btn.jump { width: 80px; border-radius: 20px; font-size: 18px; }
+
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="game-window">
+        <!-- 시작 로비 -->
+        <div id="lobby-screen">
+            <div id="lobby-title">🕹️ Action Scroller Lobbies</div>
+            <div class="nickname-container">
+                <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요" maxlength="10" value="Player">
+            </div>
+            <div class="lobby-buttons">
+                <button class="btn btn-start" id="btn-start">게임 시작</button>
+                <button class="btn btn-tab" id="btn-ranking">🏆 랭킹 보기</button>
+                <button class="btn btn-tab" id="btn-book">📖 적 도감</button>
+            </div>
+        </div>
+
+        <!-- 랭킹 모달 -->
+        <div id="ranking-modal" class="modal">
+            <span class="modal-close" id="close-ranking">&times;</span>
+            <h2>🏆 실시간 탑 랭킹 (Top 5)</h2>
+            <table class="ranking-table">
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>닉네임</th>
+                        <th>도달한 맵 수</th>
+                    </tr>
+                </thead>
+                <tbody id="ranking-list">
+                    <tr><td colspan="3">데이터를 불러오는 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 도감 모달 -->
+        <div id="book-modal" class="modal">
+            <span class="modal-close" id="close-book">&times;</span>
+            <h2>📖 등장 괴물 도감</h2>
+            <div class="book-container">
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #D50000;"></div>
+                    <div><strong>Patrol (정찰병)</strong><br>기본 왕복 이동형 적. 점프로 극복 가능.</div>
+                </div>
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #8E24AA; border-radius: 50%;"></div>
+                    <div><strong>Tracker (추적자)</strong><br>플레이어를 쫓아오며, 점프까지 따라하는 지능형.</div>
+                </div>
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #E65100; border-radius: 4px;"></div>
+                    <div><strong>Attacker (돌격대장)</strong><br>주기적으로 넓은 범위에 아우라 폭발 공격.</div>
+                </div>
+                <div class="book-item">
+                    <div class="book-visual" style="background: linear-gradient(135deg, #424242 0%, #212121 100%);"></div>
+                    <div><strong>Trap (미끼 함정)</strong><br>고정형이나, 주기적으로 거대 가시로 주변을 뒤덮음.</div>
+                </div>
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #00B0FF;"></div>
+                    <div><strong>Lancer (창지기)</strong><br>정면으로 좁고 긴 기습 찌르기를 날림. 배후 안전.</div>
+                </div>
+                <!-- Slasher 도감 -->
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #2E7D32;"></div>
+                    <div><strong>Slasher (검사)</strong><br>노란 경고 후, 하늘에서 바닥으로 빠르게 내려찍는 넓은 참격. 참격 시에만 데미지.</div>
+                </div>
+                <!-- Charger 도감 -->
+                <div class="book-item">
+                    <div class="book-visual" style="background-color: #009688;"></div>
+                    <div><strong>Charger (돌진병)</strong><br>전방에 긴 선을 표시한 뒤 매우 빠르게 돌진. 돌진하는 순간에만 피해를 줌.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 인게임 레이어 -->
+        <div id="ui-layer">도달한 맵: <span id="map-score">0</span></div>
+        
+        <div id="gameover-screen">
+            <h1>GAME OVER</h1>
+            <p id="fail-reason">적에게 당했습니다.</p>
+            <p>최종 도달한 맵 수: <span id="final-score" style="color:#FFEB3B; font-weight:bold;">0</span></p>
+            <div class="restart-tip">계속하려면 [ R ] 키를 누르거나 버튼을 탭하세요.</div>
+            <button class="btn btn-tab" style="margin-top:15px;" id="btn-back-lobby">로비 이동</button>
+            <button class="btn btn-start" style="margin-top:10px;" id="btn-restart-game">다시 시작 (R)</button>
+        </div>
+        
+        <div id="camera">
+            <div id="character"></div>
+        </div>
+    </div>
+
+    <!-- 모바일 조작 컨트롤 -->
+    <div id="mobile-controls">
+        <div class="ctrl-group">
+            <div class="ctrl-btn" id="btn-left">←</div>
+            <div class="ctrl-btn" id="btn-right">→</div>
+        </div>
+        <div class="ctrl-group">
+            <div class="ctrl-btn jump" id="btn-jump">JUMP</div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // DOM 요소 캐싱
+    const camera = document.getElementById('camera');
+    const characterElem = document.getElementById('character');
+    const mapScoreElem = document.getElementById('map-score');
+    const gameoverScreen = document.getElementById('gameover-screen');
+    const failReasonElem = document.getElementById('fail-reason');
+    const finalScoreElem = document.getElementById('final-score');
+    const lobbyScreen = document.getElementById('lobby-screen');
+    const nicknameInput = document.getElementById('nickname-input');
+    const rankingList = document.getElementById('ranking-list');
+
+    document.getElementById('btn-start').addEventListener('click', startGame);
+    document.getElementById('btn-ranking').addEventListener('click', () => { document.getElementById('ranking-modal').style.display = 'block'; });
+    document.getElementById('btn-book').addEventListener('click', () => { document.getElementById('book-modal').style.display = 'block'; });
+    document.getElementById('close-ranking').addEventListener('click', () => { document.getElementById('ranking-modal').style.display = 'none'; });
+    document.getElementById('close-book').addEventListener('click', () => { document.getElementById('book-modal').style.display = 'none'; });
+    document.getElementById('btn-back-lobby').addEventListener('click', backToLobby);
+    document.getElementById('btn-restart-game').addEventListener('click', restartGame);
+
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnJump = document.getElementById('btn-jump');
+
+    const handleTouch = (btn, code) => {
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[code] = true; checkJump(code); });
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[code] = false; });
+        btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[code] = true; checkJump(code); });
+        btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[code] = false; });
+        btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[code] = false; });
+    };
+    handleTouch(btnLeft, 'ArrowLeft');
+    handleTouch(btnRight, 'ArrowRight');
+    handleTouch(btnJump, 'Space');
+
+    // Firebase
+    let db, auth, appId, currentUser = null;
+    let scoresData = [];
+
+    const setupFirebase = async () => {
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    if (user && db) {
+                        const rankingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rankings');
+                        onSnapshot(rankingsRef, (snapshot) => {
+                            scoresData = [];
+                            snapshot.forEach(doc => { scoresData.push({ id: doc.id, ...doc.data() }); });
+                            scoresData.sort((a, b) => b.score - a.score);
+                            renderRankings(scoresData.slice(0, 5));
+                        }, (err) => console.error(err));
+                    }
+                });
+            } else {
+                rankingList.innerHTML = '<tr><td colspan="3">DB 연결 불가 (로컬 환경)</td></tr>';
+            }
+        } catch (e) { console.error(e); }
+    };
+    setupFirebase();
+
+    function renderRankings(top5) {
+        rankingList.innerHTML = '';
+        if (top5.length === 0) { rankingList.innerHTML = '<tr><td colspan="3">기록이 없습니다.</td></tr>'; return; }
+        top5.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${index + 1}</td><td>${escapeHtml(row.name)}</td><td><strong>${row.score}</strong></td>`;
+            rankingList.appendChild(tr);
+        });
+    }
+
+    async function saveScoreToDB(name, score) {
+        if (!currentUser || !db) return;
+        try {
+            const rankingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rankings');
+            await addDoc(rankingsRef, { name: name || 'Anonymous', score: parseInt(score) || 0, timestamp: Date.now() });
+        } catch (e) { console.error(e); }
+    }
+
+    function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+
+    // ─── 게임 엔진 ───
+    const mapWidth = 800; 
+    let groundY = 350;
+
+    let char = { x: 50, y: 310, w: 40, h: 40, vx: 0, vy: 0, speed: 6.5, jumpForce: -13, gravity: 0.7, isGrounded: false };
+
+    let currentStage = 0;
+    const keys = {};
+    let isGameOver = false;
+    let globalFrameCount = 0;
+    let gameLoopId = null;
+    let currentNickname = "Player";
+
+    const gameObjects = { platforms: [], obstacles: [], enemies: [] };
+    const mapColors = ['#e0f7fa', '#e8f5e9', '#fff3e0', '#fce4ec'];
+
+    // 🌟 Charger 추가 (총 7종)
+    const enemyTypes = [
+        { type: 'Patrol', w: 30, h: 30, speed: 1.5, color: '#D50000', stationary: false }, 
+        { type: 'Tracker', w: 25, h: 25, speed: 2.2, color: '#8E24AA', stationary: false }, 
+        { type: 'Attacker', w: 35, h: 35, speed: 1.0, color: '#E65100', stationary: false },
+        { type: 'Trap', w: 35, h: 35, speed: 0, color: '#424242', stationary: true },
+        { type: 'Lancer', w: 28, h: 32, speed: 1.3, color: '#00B0FF', stationary: false },
+        { type: 'Slasher', w: 30, h: 30, speed: 1.6, color: '#2E7D32', stationary: false },
+        { type: 'Charger', w: 30, h: 30, speed: 1.8, color: '#009688', stationary: false } // 새로 추가
+    ];
+
+    window.addEventListener('keydown', (e) => { 
+        if (e.target.tagName === 'INPUT') return;
+        keys[e.code] = true; 
+        checkJump(e.code);
+        if (e.code === 'KeyR' && isGameOver) restartGame();
+    });
+    window.addEventListener('keyup', (e) => { if (e.target.tagName !== 'INPUT') keys[e.code] = false; });
+
+    function checkJump(code) {
+        if (!isGameOver && lobbyScreen.style.display === 'none' && (code === 'ArrowUp' || code === 'Space') && char.isGrounded) {
+            char.vy = char.jumpForce; char.isGrounded = false;
+        }
+    }
+
+    function startGame() {
+        currentNickname = nicknameInput.value.trim() || "Player";
+        lobbyScreen.style.display = 'none';
+        groundY = document.getElementById('game-window').clientHeight - 50; 
+        char.y = groundY - char.h;
+        restartGame();
+    }
+
+    function backToLobby() {
+        if (gameLoopId) cancelAnimationFrame(gameLoopId);
+        isGameOver = false;
+        gameoverScreen.style.display = 'none';
+        lobbyScreen.style.display = 'flex';
+    }
+
+    function checkCollision(r1, r2) {
+        return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+    }
+
+    function restartGame() {
+        if (gameLoopId) cancelAnimationFrame(gameLoopId);
+        isGameOver = false; globalFrameCount = 0; currentStage = 0;
+        gameoverScreen.style.display = 'none';
+        char.x = 50; char.y = groundY - char.h; char.vx = 0; char.vy = 0; char.isGrounded = false;
+        characterElem.style.backgroundColor = '#FFEB3B';
+        mapScoreElem.innerText = "0";
+        loadStage(currentStage);
+        gameLoopId = requestAnimationFrame(update);
+    }
+
+    function getRandomEnemyType(stageIndex) {
+        const patrolProb = 1.0 - (Math.min(stageIndex, 12) * 0.05);
+        if (Math.random() < patrolProb) return enemyTypes[0];
+        
+        // 특수 적 6종 균등 확률 분배
+        const rand = Math.random();
+        if (rand < 0.16) return enemyTypes[1];
+        else if (rand < 0.33) return enemyTypes[2];
+        else if (rand < 0.50) return enemyTypes[3];
+        else if (rand < 0.66) return enemyTypes[4];
+        else if (rand < 0.83) return enemyTypes[5];
+        else return enemyTypes[6]; // Charger
+    }
+
+    function loadStage(stageIndex) {
+        const chunks = camera.querySelectorAll('.map-chunk');
+        chunks.forEach(chunk => chunk.remove());
+        
+        gameObjects.platforms = []; gameObjects.obstacles = []; gameObjects.enemies = [];
+        
+        const difficultyMultiplier = 1 + (stageIndex * 0.05); 
+        const chunk = document.createElement('div');
+        chunk.className = 'map-chunk'; chunk.style.left = `0px`; 
+        chunk.style.backgroundColor = mapColors[stageIndex % mapColors.length];
+
+        const localSolids = [];
+        const chunkGroundObject = { x: 0, y: groundY, w: mapWidth, h: 200, type: 'ground' };
+        gameObjects.platforms.push(chunkGroundObject);
+        localSolids.push(chunkGroundObject);
+
+        if (stageIndex !== 0) {
+            let lastRightEdge = 100; 
+            let lastY = groundY;
+            const numSteps = Math.floor(Math.random() * 3) + 3; 
+
+            for(let i=0; i<numSteps; i++) {
+                const gapX = Math.random() * 60 + 50; 
+                const nextX = lastRightEdge + gapX;   
+                const platW = Math.random() * 40 + 60;
+                const obsW = 40, obsH = 40;
+                
+                if (nextX + Math.max(platW, obsW) > mapWidth - 80) break; 
+
+                const maxSafeJump = 100; 
+                let nextY = lastY + (Math.random() * (maxSafeJump + 60) - maxSafeJump);
+                
+                if (nextY > groundY - 60) nextY = groundY - 60;
+                if (nextY < 80) nextY = 80;
+                if (lastY - nextY > maxSafeJump) nextY = lastY - maxSafeJump;
+
+                if (Math.random() < 0.15) {
+                    const obsY = groundY - obsH;
+                    const obs = document.createElement('div');
+                    obs.className = 'obstacle';
+                    obs.style.width = `${obsW}px`; obs.style.height = `${obsH}px`;
+                    obs.style.left = `${nextX}px`; obs.style.top = `${obsY}px`;
+                    chunk.appendChild(obs);
+                    
+                    const obsData = { x: nextX, y: obsY, w: obsW, h: obsH, type: 'obstacle' };
+                    gameObjects.obstacles.push(obsData); localSolids.push(obsData);
+                    lastY = obsY; lastRightEdge = nextX + obsW; 
+                } else {
+                    const platH = 20;
+                    const plat = document.createElement('div');
+                    plat.className = 'platform';
+                    plat.style.width = `${platW}px`; plat.style.height = `${platH}px`;
+                    plat.style.left = `${nextX}px`; plat.style.top = `${nextY}px`;
+                    chunk.appendChild(plat);
+
+                    const platData = { x: nextX, y: nextY, w: platW, h: platH, type: 'platform' };
+                    gameObjects.platforms.push(platData); localSolids.push(platData);
+                    lastY = nextY; lastRightEdge = nextX + platW; 
+                }
+            }
+
+            let maxEnemies = Math.min(1 + Math.floor(stageIndex / 3), 4); 
+            const numEnemies = Math.floor(Math.random() * maxEnemies) + 1;
+            
+            for(let i=0; i<numEnemies; i++) {
+                const typeInfo = getRandomEnemyType(stageIndex);
+                const safeMinX = 250, safeMaxX = mapWidth - 50;
+                const rightBias = Math.pow(Math.random(), 0.5); 
+                const globalX = safeMinX + rightBias * (safeMaxX - safeMinX);
+                
+                let highestObjectY = groundY;
+                for (const solid of localSolids) {
+                    if (globalX + typeInfo.w > solid.x && globalX < solid.x + solid.w) {
+                        if (solid.y < highestObjectY) highestObjectY = solid.y;
+                    }
+                }
+
+                let spawnY = highestObjectY - typeInfo.h - 60; 
+                const enemyElem = document.createElement('div');
+                enemyElem.className = `enemy ${typeInfo.type.toLowerCase()}`;
+                enemyElem.style.width = `${typeInfo.w}px`; enemyElem.style.height = `${typeInfo.h}px`;
+                
+                if (!typeInfo.stationary) {
+                    enemyElem.style.backgroundColor = typeInfo.color;
+                    if (typeInfo.type === 'Attacker') enemyElem.style.borderRadius = '4px'; 
+                }
+                enemyElem.style.transform = `translate(${globalX}px, ${spawnY}px)`;
+                chunk.appendChild(enemyElem);
+
+                let auraElem = null, warningElem = null, hitElem = null;
+
+                if (typeInfo.type === 'Attacker') {
+                    auraElem = document.createElement('div'); auraElem.className = 'weapon-aura'; enemyElem.appendChild(auraElem);
+                } else if (typeInfo.type === 'Lancer') {
+                    auraElem = document.createElement('div'); auraElem.className = 'spear-aura right'; enemyElem.appendChild(auraElem);
+                } else if (typeInfo.type === 'Slasher') {
+                    warningElem = document.createElement('div'); warningElem.className = 'slash-warning right'; enemyElem.appendChild(warningElem);
+                    hitElem = document.createElement('div'); hitElem.className = 'slash-hit right'; enemyElem.appendChild(hitElem);
+                } else if (typeInfo.type === 'Charger') {
+                    // 🚀 Charger 전용 경고 이펙트
+                    warningElem = document.createElement('div'); warningElem.className = 'dash-warning right'; enemyElem.appendChild(warningElem);
+                }
+
+                const initialVx = typeInfo.stationary ? 0 : typeInfo.speed * difficultyMultiplier * (Math.random() > 0.5 ? 1 : -1);
+
+                gameObjects.enemies.push({ 
+                    element: enemyElem, auraElement: auraElem, warningElement: warningElem, hitElement: hitElem,
+                    type: typeInfo.type, 
+                    x: globalX, lastX: globalX, y: spawnY, w: typeInfo.w, h: typeInfo.h,
+                    vx: initialVx, vy: 0, stationary: typeInfo.stationary,
+                    baseSpeed: typeInfo.speed * difficultyMultiplier, facingDir: initialVx >= 0 ? 'right' : 'left',
+                    isAttacking: false, isWarning: false, isGrounded: false 
+                });
+            }
+        }
+        camera.appendChild(chunk);
+    }
+
+    function applyPhysicsAndCollision(entity, solidObjects, isEnemy = false) {
+        let nextX = entity.x + entity.vx;
+        let rectX = { x: nextX, y: entity.y + 2, w: entity.w, h: entity.h - 4 };
+
+        for (const obj of solidObjects) {
+            if (obj.type === 'ground') continue;
+            if (checkCollision(rectX, obj)) {
+                if (entity.vx > 0) { 
+                    nextX = obj.x - entity.w; 
+                    if (isEnemy && entity.type !== 'Tracker') entity.vx *= -1; 
+                } else if (entity.vx < 0) { 
+                    nextX = obj.x + obj.w; 
+                    if (isEnemy && entity.type !== 'Tracker') entity.vx *= -1; 
+                }
+                if (!isEnemy) entity.vx = 0;
+            }
+        }
+        entity.x = nextX;
+
+        entity.vy += char.gravity;
+        if (entity.vy > 12) entity.vy = 12;
+
+        let nextY = entity.y + entity.vy;
+        entity.isGrounded = false;
+        let rectY = { x: entity.x + 2, y: nextY, w: entity.w - 4, h: entity.h };
+
+        for (const obj of solidObjects) {
+            if (checkCollision(rectY, obj)) {
+                if (entity.vy > 0) { nextY = obj.y - entity.h; entity.vy = 0; entity.isGrounded = true; } 
+                else if (entity.vy < 0 && obj.type !== 'ground') { nextY = obj.y + obj.h; entity.vy = 0; }
+                rectY.y = nextY; 
+            }
+        }
+        entity.y = nextY;
+
+        if (entity.y + entity.h > groundY) { entity.y = groundY - entity.h; entity.vy = 0; entity.isGrounded = true; }
+    }
+
+    function update() {
+        if (isGameOver) return;
+        globalFrameCount++;
+
+        char.vx = 0;
+        if (keys['ArrowRight']) char.vx = char.speed;
+        if (keys['ArrowLeft']) char.vx = -char.speed;
+
+        const solidObjects = [...gameObjects.platforms, ...gameObjects.obstacles];
+        applyPhysicsAndCollision(char, solidObjects, false);
+
+        for (const enemy of gameObjects.enemies) {
+            if (!enemy.stationary && !enemy.isAttacking && !enemy.isWarning) {
+                if (enemy.vx > 0) enemy.facingDir = 'right';
+                else if (enemy.vx < 0) enemy.facingDir = 'left';
+            }
+
+            if (enemy.type === 'Tracker') {
+                if (char.x > enemy.x) enemy.vx = enemy.baseSpeed; else if (char.x < enemy.x) enemy.vx = -enemy.baseSpeed;
+                if (enemy.isGrounded && (char.y < enemy.y - 30 || Math.abs(enemy.x - enemy.lastX) < 0.5)) {
+                    if (Math.random() < 0.08) { enemy.vy = -11; enemy.isGrounded = false; }
+                }
+                enemy.lastX = enemy.x; 
+            } 
+            else if (enemy.type === 'Attacker') {
+                if (globalFrameCount % 150 === 0) {
+                    enemy.auraElement.classList.add('active');
+                    setTimeout(() => { if (!isGameOver) enemy.isAttacking = true; }, 150);
+                    setTimeout(() => { if(!isGameOver) { enemy.isAttacking = false; enemy.auraElement.classList.remove('active'); } }, 650); 
+                }
+            }
+            else if (enemy.type === 'Trap') {
+                if (globalFrameCount % 80 === 0) {
+                    if (!enemy.element || !enemy.element.parentNode) continue; 
+                    enemy.isAttacking = true; enemy.element.classList.add('active'); 
+                    setTimeout(() => { if(!isGameOver && enemy.element) { enemy.isAttacking = false; enemy.element.classList.remove('active'); } }, 250); 
+                }
+            }
+            else if (enemy.type === 'Lancer') {
+                if (globalFrameCount % 130 === 0) {
+                    enemy.isAttacking = true; const cachedSpeed = enemy.vx; enemy.vx = 0;
+                    enemy.auraElement.className = `spear-aura ${enemy.facingDir} active`;
+                    setTimeout(() => {
+                        if (!isGameOver && enemy.element) {
+                            enemy.isAttacking = false; enemy.auraElement.classList.remove('active');
+                            enemy.vx = cachedSpeed === 0 ? (enemy.facingDir === 'right' ? enemy.baseSpeed : -enemy.baseSpeed) : cachedSpeed;
+                        }
+                    }, 400);
+                }
+            }
+            else if (enemy.type === 'Slasher') {
+                if (!enemy.isAttacking && !enemy.isWarning) {
+                    enemy.warningElement.className = `slash-warning ${enemy.facingDir}`;
+                    enemy.hitElement.className = `slash-hit ${enemy.facingDir}`;
+                }
+                if (globalFrameCount % 180 === 0 && !enemy.isAttacking && !enemy.isWarning) {
+                    enemy.isWarning = true; const cachedSpeed = enemy.vx; enemy.vx = 0;
+                    enemy.warningElement.classList.add('active'); 
+                    setTimeout(() => {
+                        if (!isGameOver && enemy.element) {
+                            enemy.warningElement.classList.remove('active'); enemy.isWarning = false;
+                            enemy.isAttacking = true; enemy.hitElement.classList.add('active'); 
+                            setTimeout(() => {
+                                if (!isGameOver && enemy.element) {
+                                    enemy.isAttacking = false; enemy.hitElement.classList.remove('active');
+                                    enemy.vx = cachedSpeed === 0 ? (enemy.facingDir === 'right' ? enemy.baseSpeed : -enemy.baseSpeed) : cachedSpeed;
+                                }
+                            }, 150); 
+                        }
+                    }, 300); 
+                }
+            }
+            else if (enemy.type === 'Charger') {
+                // 🚀 Charger 대시 로직
+                if (!enemy.isAttacking && !enemy.isWarning) {
+                    enemy.warningElement.className = `dash-warning ${enemy.facingDir}`;
+                }
+                if (globalFrameCount % 200 === 0 && !enemy.isAttacking && !enemy.isWarning) {
+                    enemy.isWarning = true; 
+                    const cachedSpeed = enemy.vx; 
+                    enemy.vx = 0; // 멈춰서 기 모으기
+                    enemy.warningElement.classList.add('active'); // 노란 경로 표시
+                    
+                    setTimeout(() => {
+                        if (!isGameOver && enemy.element && enemy.element.parentNode) {
+                            enemy.warningElement.classList.remove('active'); 
+                            enemy.isWarning = false;
+                            
+                            // 💥 대시 발동! (속도 대폭 상승 + 붉은색 외형)
+                            enemy.isAttacking = true; 
+                            enemy.element.classList.add('dashing'); 
+                            enemy.vx = enemy.facingDir === 'right' ? 12 : -12; // 초고속
+                            
+                            setTimeout(() => {
+                                if (!isGameOver && enemy.element && enemy.element.parentNode) {
+                                    enemy.isAttacking = false; 
+                                    enemy.element.classList.remove('dashing');
+                                    enemy.vx = cachedSpeed === 0 ? (enemy.facingDir === 'right' ? enemy.baseSpeed : -enemy.baseSpeed) : cachedSpeed;
+                                }
+                            }, 250); // 0.25초간 대시 유지
+                        }
+                    }, 400); // 0.4초 경고 시간
+                }
+            }
+
+            applyPhysicsAndCollision(enemy, solidObjects, true);
+
+            if (!enemy.stationary) {
+                if (enemy.x <= 0) { enemy.x = 0; if (enemy.type !== 'Tracker') enemy.vx = Math.abs(enemy.baseSpeed); } 
+                else if (enemy.x + enemy.w >= mapWidth) { enemy.x = mapWidth - enemy.w; if (enemy.type !== 'Tracker') enemy.vx = -Math.abs(enemy.baseSpeed); }
+            }
+
+            enemy.element.style.transform = `translate(${enemy.x}px, ${enemy.y}px)`;
+
+            // 🌟 닿기만 해도 죽지 않는 적들(공격 시에만 피격 판정 발생)
+            if ((enemy.type === 'Trap' || enemy.type === 'Lancer' || enemy.type === 'Slasher' || enemy.type === 'Charger') && !enemy.isAttacking) continue; 
+
+            let finalHitBox;
+            if (enemy.isAttacking && (enemy.type === 'Attacker' || enemy.type === 'Trap')) {
+                const scale = 2.5; 
+                finalHitBox = { x: enemy.x - ((enemy.w * scale - enemy.w)/2), y: enemy.y - ((enemy.h * scale - enemy.h)/2), w: enemy.w * scale, h: enemy.h * scale };
+            } 
+            else if (enemy.isAttacking && enemy.type === 'Lancer') {
+                const spearRange = 80, spearHeight = 12, spearY = enemy.y + 5;
+                finalHitBox = enemy.facingDir === 'right' ? 
+                    { x: enemy.x + enemy.w, y: spearY, w: spearRange, h: spearHeight } : { x: enemy.x - spearRange, y: spearY, w: spearRange, h: spearHeight };
+            }
+            else if (enemy.isAttacking && enemy.type === 'Slasher') {
+                const slashRange = 70, slashHeight = 70, slashY = enemy.y + enemy.h - slashHeight; 
+                finalHitBox = enemy.facingDir === 'right' ? 
+                    { x: enemy.x + enemy.w, y: slashY, w: slashRange, h: slashHeight } : { x: enemy.x - slashRange, y: slashY, w: slashRange, h: slashHeight };
+            }
+            else if (enemy.isAttacking && enemy.type === 'Charger') {
+                // 대시 중인 Charger 본체가 곧 무기
+                finalHitBox = { x: enemy.x - 5, y: enemy.y, w: enemy.w + 10, h: enemy.h }; 
+            }
+            else {
+                const shrinkW = enemy.w * 0.15, shrinkH = enemy.h * 0.15;
+                finalHitBox = { x: enemy.x + shrinkW, y: enemy.y + shrinkH, w: enemy.w - (shrinkW * 2), h: enemy.h - (shrinkH * 2) };
+            }
+
+            if (checkCollision({ x: char.x, y: char.y, w: char.w, h: char.h }, finalHitBox)) {
+                isGameOver = true; characterElem.style.backgroundColor = '#000'; 
+                
+                if (enemy.type === 'Trap') failReasonElem.innerText = '☠️ 함정에 걸렸습니다.';
+                else if (enemy.type === 'Lancer') failReasonElem.innerText = '🔱 창지기의 전방 찌르기에 꿰뚫렸습니다.';
+                else if (enemy.type === 'Slasher') failReasonElem.innerText = '⚔️ 검사의 치명적인 참격에 베였습니다.';
+                else if (enemy.type === 'Charger') failReasonElem.innerText = '💨 돌진하는 적에게 치였습니다.';
+                else failReasonElem.innerText = '⚔️ 적에게 당했습니다.';
+                
+                finalScoreElem.innerText = currentStage; gameoverScreen.style.display = 'flex'; 
+                saveScoreToDB(currentNickname, currentStage); return; 
+            }
+        }
+
+        if (char.x < 0) char.x = 0;
+        characterElem.style.transform = `translate(${char.x}px, ${char.y}px)`;
+
+        const gameWinWidth = document.getElementById('game-window').clientWidth;
+        if (gameWinWidth < mapWidth) {
+            let camX = (gameWinWidth / 2) - (char.x + char.w / 2);
+            if (camX > 0) camX = 0; 
+            const minCamX = -(mapWidth - gameWinWidth);
+            if (camX < minCamX) camX = minCamX; 
+            camera.style.transform = `translateX(${camX}px)`;
+        } else {
+            camera.style.transform = `translateX(0px)`;
+        }
+
+        if (char.x + char.w >= mapWidth) { 
+            currentStage++; loadStage(currentStage); char.x = 20; mapScoreElem.innerText = currentStage; 
+        } 
+        
+        gameLoopId = requestAnimationFrame(update);
+    }
+</script>
+</body>
+</html>
